@@ -42,11 +42,11 @@ jobs:
           path: SilverioNL/dist
       
       # Build Nginx Docker Image
-      - name: Build Nginx Image
+      - name: Build SilverioNL Nginx Image
         run: |
           docker build \
-            -t cashflow-nginx:latest \
-            -f docker/nginx.Dockerfile \
+            -t silverio.nl:latest \
+            -f docker/silverio.nl.Dockerfile \
             .
       # Login to GHCR using packages PAT
       - name: Login to GHCR
@@ -55,12 +55,12 @@ jobs:
       # Tag image for GHCR
       - name: Tag Nginx Image
         run: |
-          docker tag cashflow-nginx:latest ghcr.io/benjosilverio-nl/cashflow-nginx:latest
+          docker tag silverio.nl:latest ghcr.io/benjosilverio-nl/silverio.nl:latest
 
       # Push correct Nginx runtime image
       - name: Push Nginx Image
         run: |
-          docker push ghcr.io/benjosilverio-nl/cashflow-nginx:latest
+          docker push ghcr.io/benjosilverio-nl/silverio.nl:latest
   
   deploy:
     runs-on: ubuntu-latest
