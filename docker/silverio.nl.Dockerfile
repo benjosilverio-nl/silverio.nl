@@ -5,7 +5,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy your full custom config
 COPY docker/etc/nginx/nginx.production.conf /etc/nginx/nginx.conf
-
+RUN pwd && ls -la
 # Copy built frontend from CI
 COPY SilverioNL-dist /var/www/html
 
