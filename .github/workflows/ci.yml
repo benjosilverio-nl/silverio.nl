@@ -1,0 +1,87 @@
+name: Silverio.nl Orchestrator CI/CD
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [build_all]
+
+jobs:
+  build-silverio_nl:
+    runs-on: ubuntu-latest
+
+    steps:
+      #Checkout Infra Repository
+      - name: Checkout Infra Repository
+        uses: actions/checkout@v4
+
+      #Clone Frontend Repository
+      - name: Clone SilverioNL Repository
+        uses: actions/checkout@v4
+        with:
+          repository: benjosilverio-nl/silverio.nl
+          ref: master
+          path: SilverioNL
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build SilverioNL
+        run: |
+          cd SilverioNL
+          npm ci
+          npm run build
+
+      # Upload dist for debugging
+      - name: Upload dist folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilverioNL-dist
+          path: SilverioNL/dist
+      
+      # Build Nginx Docker Image
+      - name: Build Nginx Image
+        run: |
+          docker build \
+            -t cashflow-nginx:latest \
+            -f docker/nginx.Dockerfile \
+            .
+      # Login to GHCR using packages PAT
+      - name: Login to GHCR
+        run: echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      
+      # Tag image for GHCR
+      - name: Tag Nginx Image
+        run: |
+          docker tag cashflow-nginx:latest ghcr.io/benjosilverio-nl/cashflow-nginx:latest
+
+      # Push correct Nginx runtime image
+      - name: Push Nginx Image
+        run: |
+          docker push ghcr.io/benjosilverio-nl/cashflow-nginx:latest
+  
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-silverio_nl
+
+    steps:
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Login to GHCR on droplet
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DROPLET_IP }} "
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          "
+
+      - name: Deploy to droplet
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DROPLET_IP }} "
+            docker compose -f /root/cashflow-infra/compose.yml pull silverio.nl_frontend && \
+            docker compose -f /root/cashflow-infra/compose.yml up -d silverio.nl_frontend
+          "
